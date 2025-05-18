@@ -18,7 +18,17 @@ import { randomBytes, createHash as cryptoCreateHash } from 'crypto';
 //@ts-ignore
 import lnurl from 'lnurl';
 import bolt11 from 'bolt11';
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
+
+interface CoinMarketCapResponse {
+  data: Array<{
+    quote: {
+      USD: {
+        price: number;
+      };
+    };
+  }>;
+}
 
 const DOMAIN = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -221,22 +231,19 @@ export const updateLnPayment: UpdateLnPayment<LightningInvoice, LnPayment> = asy
 };
 
 const getBitcoinPrice = async () => {
-  let response = null;
-
   try {
-    response = await axios.get('https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest', {
+    const response: AxiosResponse<CoinMarketCapResponse> = await axios.get('https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest', {
       headers: {
         'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API_KEY!,
       },
     });
-  } catch (error: any) {
-    console.log('error calling coinmarket cap api: ', error.message);
-    return null;
-  }
-  if (response) {
+    
     const json = response.data.data[0].quote.USD.price;
     console.log(json);
     return json;
+  } catch (error: any) {
+    console.log('error calling coinmarket cap api: ', error.message);
+    return null;
   }
 };
 
@@ -250,7 +257,7 @@ const getBitcoinPrice = async () => {
 
 export const milliSatsToCents: MilliSatsToCents<{ milliSats: number }, number> = async ({ milliSats }, _context) => {
   const bitcoinPrice = await getBitcoinPrice();
-  if (bitcoinPrice === null) return 0;
+  if (!bitcoinPrice) return 0;
 
   const dollarsPerSat = bitcoinPrice / 100_000_000; //
   const centsPerDollar = (milliSats / 1000) * dollarsPerSat;
